@@ -36,6 +36,5 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run weekly report script
-        run: |
-          python -m src.main
+        run: python -u -m src.main
 
