@@ -12,6 +12,7 @@ jobs:
 
     env:
       PYTHONUNBUFFERED: "1"
+      AI_BASE_URL: ${{ secrets.AI_BASE_URL }}
       FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
       FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
       FEISHU_REPORT_CHAT_ID: ${{ secrets.FEISHU_REPORT_CHAT_ID }}
