@@ -2,15 +2,16 @@ name: Weekly Report to Feishu
 
 on:
   schedule:
-    # 每周一 10:00（北京时间 UTC+8）= UTC 周一 02:00
     - cron: "0 2 * * MON"
   workflow_dispatch: {}
 
 jobs:
   send-weekly-report:
     runs-on: ubuntu-latest
-  timeout-minutes: 30
+    timeout-minutes: 30
+
     env:
+      PYTHONUNBUFFERED: "1"
       FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
       FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
       FEISHU_REPORT_CHAT_ID: ${{ secrets.FEISHU_REPORT_CHAT_ID }}
@@ -37,4 +38,3 @@ jobs:
 
       - name: Run weekly report script
         run: python -u -m src.main
-
