@@ -6,6 +6,11 @@
 - 生成周报并发送到飞书群
 """
 
+def main() -> None:
+    import asyncio
+    print("[周报] ===== 脚本启动 =====")   # ← 加这一行
+    asyncio.run(run_weekly_pipeline())
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta
