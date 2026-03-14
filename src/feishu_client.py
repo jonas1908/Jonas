@@ -51,14 +51,26 @@ def send_weekly_report_card(
 
     token = get_tenant_access_token(app_id=app_id, app_secret=app_secret)
 
-    # 最小可用：先发一条文本周报占位消息，确认链路打通
-    title = "周报机器人测试"
-    text = (
-        f"{title}\n"
-        f"- 时间：{report.week_start:%Y-%m-%d} ~ {report.week_end:%Y-%m-%d}\n"
-        f"- 条目数：{len(report.suggestions)}\n"
-        f"- 总结：{report.overall_summary or '（待生成）'}"
-    )
+    title = "📋 Discord 玩家建议周报"
+    lines = [
+        title,
+        f"📅 时间：{report.week_start:%Y-%m-%d} ~ {report.week_end:%Y-%m-%d}",
+        f"📊 条目数：{len(report.suggestions)}",
+        "",
+        "【本周概览】",
+        report.overall_summary or "（暂无）",
+    ]
+    if report.highlights:
+        lines.append("")
+        lines.append("【高优先级建议 TOP5】")
+        for i, h in enumerate(report.highlights, 1):
+            lines.append(f"{i}. {h}")
+    if report.stats.get("by_category"):
+        lines.append("")
+        lines.append("【分类统计】")
+        for cat, count in report.stats["by_category"].items():
+            lines.append(f"- {cat}：{count} 条")
+    text = "\n".join(lines)
 
     send_text_message_to_chat(
         tenant_access_token=token.token,

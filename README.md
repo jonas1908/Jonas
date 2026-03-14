@@ -1,41 +1,69 @@
-# Discord 飞书周报工具（项目骨架）
+# Discord 飞书周报工具
 
-本项目的目标：
+每周从 Discord 指定频道拉取玩家建议 → 用 OpenAI 分析（分类、总结、打分）→ 生成周报发到飞书群。
 
-- 从 Discord 某个频道自动收集玩家建议帖子（每周一次）
-- 用 AI 分析每条建议：自动分类、总结、打分
-- 把分析结果写入飞书多维表格
-- 自动生成一张漂亮的周报卡片，发到飞书群
+## 流程
 
-当前阶段：**只完成了项目结构和基础代码骨架，暂未真正接入 API**。
+1. **Discord**：Bot 从指定服务器/频道拉取本周内的消息  
+2. **AI**：OpenAI 对每条做分类、总结、优先级打分  
+3. **飞书**：应用机器人把周报（概览 + TOP5 + 分类统计）发到指定群
 
-## 使用技术（后面会一步步教你）
+## 本地运行
 
-- **Python 3.10+**：主要开发语言
-- **discord.py**：和 Discord 交互，读取频道消息
-- **OpenAI / 类似大模型 API**：对文本做分类、总结、打分
-- **飞书开放平台 + lark-oapi**：写入多维表格、发送卡片消息
+```bash
+cd "/Users/zhangyong/Desktop/周报工具"
+source .venv/bin/activate
 
-## 目录结构概览
+# 设置环境变量（或使用 .env）
+export FEISHU_APP_ID="..."
+export FEISHU_APP_SECRET="..."
+export FEISHU_REPORT_CHAT_ID="oc_..."
+export DISCORD_BOT_TOKEN="..."
+export DISCORD_GUILD_ID="123456789"
+export DISCORD_CHANNEL_ID="123456789"
+export OPENAI_API_KEY="sk-..."
+# 可选：OPENAI_MODEL=gpt-4.1-mini
 
-- `README.md`：项目说明（你现在看的这个文件）
-- `requirements.txt`：Python 依赖列表
-- `.env.example`：环境变量示例（需要你复制成 `.env` 后填入自己的密钥）
-- `.gitignore`：忽略不需要提交的文件（如 `.env`）
-- `src/`：项目所有源代码
-  - `__init__.py`：标记为 Python 包
-  - `config.py`：读取配置和环境变量
-  - `models.py`：统一的数据结构定义（帖子、分析结果、周报等）
-  - `discord_client.py`：连接 Discord，按时间范围拉取频道消息
-  - `ai_analyzer.py`：调用 AI，对单条/多条建议做分类、总结、打分
-  - `feishu_client.py`：写多维表格、发周报卡片到飞书
-  - `main.py`：主流程入口（一次完整的“周报生成流水线”）
+python -m src.main
+```
 
-接下来，我们会一步一步：
+## GitHub Actions 每周定时
 
-1. 安装 Python 和依赖
-2. 在 Discord、飞书、OpenAI 控制台里创建应用并拿到密钥
-3. 填写 `.env` 配置
-4. 逐步实现每个模块的真实逻辑
-5. 配置定时任务，让周报每周自动跑一次
+- 工作流文件：`.github/workflows/weekly-report.yml`  
+- 默认：每周一北京时间 10:00 执行  
+- 可在仓库 **Actions** 里 **Run workflow** 手动触发测试  
 
+### 需要在仓库里配置的 Secrets
+
+| 名称 | 说明 |
+|------|------|
+| `FEISHU_APP_ID` | 飞书应用 App ID |
+| `FEISHU_APP_SECRET` | 飞书应用 App Secret |
+| `FEISHU_REPORT_CHAT_ID` | 发周报的飞书群 chat_id（如 `oc_xxx`） |
+| `DISCORD_BOT_TOKEN` | Discord Bot Token |
+| `DISCORD_GUILD_ID` | Discord 服务器 ID |
+| `DISCORD_CHANNEL_ID` | 要收集建议的 Discord 频道 ID |
+| `OPENAI_API_KEY` | OpenAI API Key |
+| `OPENAI_MODEL` | 可选，默认 `gpt-4.1-mini` |
+
+## Discord Bot 准备
+
+1. [Discord Developer Portal](https://discord.com/developers/applications) 创建应用，在 **Bot** 里添加 Bot，复制 **Token**  
+2. 在 **Bot** 里开启 **Message Content Intent**（否则读不到消息内容）  
+3. 把 Bot 邀请进服务器，并赋予「查看频道」「读取消息历史」权限  
+4. 服务器 ID、频道 ID：在 Discord 里开启「开发者模式」，右键服务器/频道即可「复制 ID」
+
+## 飞书
+
+- 自建应用需开启「机器人」能力  
+- 权限：发消息、获取群信息等（见飞书开放平台文档）  
+- 获取群 `chat_id`：可运行 `python -m src.tools.feishu_list_chats`（需先设置 `FEISHU_APP_ID`、`FEISHU_APP_SECRET`）
+
+## 目录结构
+
+- `src/main.py`：入口，串联 Discord → AI → 飞书  
+- `src/discord_client.py`：拉取 Discord 频道消息  
+- `src/ai_analyzer.py`：OpenAI 分析 + 周报汇总  
+- `src/feishu_client.py`：飞书发周报  
+- `src/feishu_api.py`：飞书 OpenAPI（token、发消息）  
+- `src/tools/feishu_list_chats.py`：列出机器人所在群，查 chat_id  
