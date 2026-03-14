@@ -1,5 +1,6 @@
 """Discord HTTP API 拉取消息（不用 WebSocket，不会卡住）"""
 
+import time
 import requests
 from datetime import datetime, timezone
 from typing import List
@@ -7,21 +8,16 @@ from typing import List
 from .config import AppConfig
 from .models import RawDiscordMessage
 
-# 防止拉取过多导致长时间运行，最多拉 20 页
 MAX_PAGES = 20
 
-
 def _to_snowflake(dt: datetime) -> int:
-    """把时间转为 Discord snowflake 数值（用于比较）。"""
     if dt.tzinfo is not None:
         dt = dt.astimezone(timezone.utc)
     epoch = datetime(2015, 1, 1, tzinfo=timezone.utc)
     ms = int((dt.replace(tzinfo=timezone.utc) - epoch).total_seconds() * 1000)
     return ms << 22
 
-
 def _parse_discord_ts(ts: str) -> datetime:
-    """解析 Discord 返回的 ISO 时间字符串为 datetime。"""
     if not ts:
         return datetime.now(timezone.utc)
     try:
@@ -30,12 +26,9 @@ def _parse_discord_ts(ts: str) -> datetime:
     except Exception:
         return datetime.now(timezone.utc)
 
-
-async def fetch_suggestions_for_period(
-    config: AppConfig, start_time: datetime, end_time: datetime
-) -> List[RawDiscordMessage]:
+async def fetch_suggestions_for_period(config: AppConfig, start_time: datetime, end_time: datetime) -> List[RawDiscordMessage]:
     if not config.discord.bot_token or not config.discord.guild_id or not config.discord.channel_id:
-        print("[Discord] 缺少配置（DISCORD_BOT_TOKEN/GUILD_ID/CHANNEL_ID），跳过拉取。")
+        print("[Discord] 缺少配置，跳过拉取。")
         return []
 
     print("[Discord] 开始拉取消息...")
@@ -56,6 +49,14 @@ async def fetch_suggestions_for_period(
         except Exception as e:
             print(f"[Discord] ❌ 请求异常: {e}")
             break
+
+        # 限速处理：自动等待重试
+        if resp.status_code == 429:
+            retry_after = resp.json().get("retry_after", 1)
+            print(f"[Discord] ⏳ 限速中，等待 {retry_after} 秒...")
+            time.sleep(retry_after + 0.5)
+            page -= 1
+            continue
 
         if resp.status_code != 200:
             print(f"[Discord] ❌ API 错误: {resp.status_code} {resp.text[:300]}")
@@ -88,8 +89,12 @@ async def fetch_suggestions_for_period(
             )
             after_id = str(msg_id)
 
+        print(f"[Discord] 第 {page} 页，累计 {len(fetched)} 条")
+
         if len(messages) < 100:
             break
+
+        time.sleep(0.5)
 
     print(f"[Discord] ✅ 拉取完成，共 {len(fetched)} 条")
     return fetched
