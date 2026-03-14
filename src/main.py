@@ -35,14 +35,21 @@ async def run_weekly_pipeline() -> None:
     week_start, week_end = _get_current_week_range(config.timezone)
 
     # 1. 从 Discord 拉取本周消息
+    has_discord = bool(
+        config.discord.bot_token and config.discord.guild_id and config.discord.channel_id
+    )
+    if not has_discord:
+        print("[周报] 未配置 Discord（缺 DISCORD_BOT_TOKEN/GUILD_ID/CHANNEL_ID），按 0 条处理。")
     raw_messages = await fetch_suggestions_for_period(
         config=config,
         start_time=week_start,
         end_time=week_end,
     )
+    print(f"[周报] Discord 拉取到 {len(raw_messages)} 条消息。")
 
     # 2. AI 批量分析
     analyzed = analyze_batch_suggestions(config=config, messages=raw_messages)
+    print(f"[周报] AI 分析完成，共 {len(analyzed)} 条。")
 
     # 3. 生成周报
     report = build_weekly_report(
@@ -51,9 +58,12 @@ async def run_weekly_pipeline() -> None:
         week_start=week_start,
         week_end=week_end,
     )
+    if not analyzed:
+        print("[周报] 本周暂无玩家建议，将发送「本周暂无玩家建议」到飞书。")
 
     # 4. 发送到飞书群
     send_weekly_report_card(config=config, report=report)
+    print("[周报] 飞书周报已发送。")
 
 
 def main() -> None:

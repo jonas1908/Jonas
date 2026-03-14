@@ -52,13 +52,14 @@ def send_weekly_report_card(
     token = get_tenant_access_token(app_id=app_id, app_secret=app_secret)
 
     title = "📋 Discord 玩家建议周报"
+    summary_text = report.overall_summary if report.overall_summary else "本周暂无玩家建议。"
     lines = [
         title,
         f"📅 时间：{report.week_start:%Y-%m-%d} ~ {report.week_end:%Y-%m-%d}",
         f"📊 条目数：{len(report.suggestions)}",
         "",
         "【本周概览】",
-        report.overall_summary or "（暂无）",
+        summary_text,
     ]
     if report.highlights:
         lines.append("")
