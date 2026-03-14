@@ -1,7 +1,7 @@
 """
 配置与环境变量读取模块。
 
-负责从 `.env` 和系统环境中读取：
+负责从 .env 和系统环境中读取：
 - Discord、OpenAI、飞书的密钥
 - 频道 / 表格 / 群聊 ID
 - 其它通用配置（时区等）
@@ -13,19 +13,12 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ENV_PATH = PROJECT_ROOT / ".env"
 
-
 def load_env() -> None:
-    """
-    加载 .env 文件（如果存在）。
-    只需在程序启动时调用一次。
-    """
     if ENV_PATH.exists():
         load_dotenv(ENV_PATH)
-
 
 @dataclass
 class DiscordConfig:
@@ -33,12 +26,11 @@ class DiscordConfig:
     guild_id: int
     channel_id: int
 
-
 @dataclass
 class OpenAIConfig:
     api_key: str
     model: str = "gpt-4.1-mini"
-
+    base_url: str = ""
 
 @dataclass
 class FeishuConfig:
@@ -48,7 +40,6 @@ class FeishuConfig:
     bitable_table_id: str
     report_chat_id: str
 
-
 @dataclass
 class AppConfig:
     discord: DiscordConfig
@@ -56,12 +47,7 @@ class AppConfig:
     feishu: FeishuConfig
     timezone: str = "Asia/Shanghai"
 
-
 def get_config() -> AppConfig:
-    """
-    读取并组装完整配置。
-    若必填项缺失，后续实现中可以在这里加校验和友好错误提示。
-    """
     load_env()
 
     discord = DiscordConfig(
@@ -73,6 +59,7 @@ def get_config() -> AppConfig:
     openai_cfg = OpenAIConfig(
         api_key=os.getenv("OPENAI_API_KEY", ""),
         model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
+        base_url=os.getenv("AI_BASE_URL", ""),
     )
 
     feishu = FeishuConfig(
@@ -91,4 +78,3 @@ def get_config() -> AppConfig:
         feishu=feishu,
         timezone=timezone,
     )
-
