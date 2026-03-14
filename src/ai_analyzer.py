@@ -81,7 +81,10 @@ def analyze_batch_suggestions(
             for msg in messages
         ]
 
-    client = OpenAI(api_key=config.openai.api_key)
+    if config.openai.base_url:
+            client = OpenAI(api_key=config.openai.api_key, base_url=config.openai.base_url)
+        else:
+            client = OpenAI(api_key=config.openai.api_key)
     result: List[AnalyzedSuggestion] = []
     batch_size = 20
     total_batches = (len(messages) + batch_size - 1) // batch_size
