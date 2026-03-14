@@ -34,8 +34,15 @@ async def run_weekly_pipeline():
 
 def main():
     import asyncio
+    import sys
     print("[周报] ===== 脚本启动 =====")
-    asyncio.run(run_weekly_pipeline())
+    try:
+        asyncio.run(run_weekly_pipeline())
+    except Exception as e:
+        print(f"[周报] ❌ 执行失败: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
