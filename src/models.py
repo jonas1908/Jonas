@@ -22,6 +22,7 @@ class TopSuggestion:
     heat_score: int
     anger_score: float
     similar_count: int
+    jump_url: str = ""
 
 @dataclass
 class WeeklyReport:

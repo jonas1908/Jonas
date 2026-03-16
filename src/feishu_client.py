@@ -11,7 +11,7 @@ def send_weekly_report_card(config, report):
     app_secret = config.feishu.app_secret
     chat_id = config.feishu.report_chat_id
     if not app_id or not app_secret or not chat_id:
-        raise RuntimeError("缺少飞书配置：需要 FEISHU_APP_ID / FEISHU_APP_SECRET / FEISHU_REPORT_CHAT_ID")
+        raise RuntimeError("缺少飞书配置")
     token = get_tenant_access_token(app_id=app_id, app_secret=app_secret)
     lines = []
     lines.append("🏆 本周玩家建议 Top 10")
@@ -26,8 +26,10 @@ def send_weekly_report_card(config, report):
             lines.append(emoji + " Top" + str(s.rank) + "：" + s.title)
             lines.append(s.description)
             lines.append("🔥 热度: " + str(s.heat_score) + "  😡 情绪分: " + str(s.anger_score) + "/10  📋 建议数: " + str(s.similar_count))
+            if s.jump_url:
+                lines.append("🔗 " + s.jump_url)
             lines.append("")
     text = "\n".join(lines)
-    print("[飞书] 发送内容预览:")
+    print("[飞书] 发送内容:")
     print(text)
     send_text_message_to_chat(tenant_access_token=token.token, chat_id=chat_id, text=text)
