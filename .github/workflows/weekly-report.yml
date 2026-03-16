@@ -8,11 +8,10 @@ on:
 jobs:
   send-weekly-report:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 10
 
     env:
       PYTHONUNBUFFERED: "1"
-      AI_BASE_URL: ${{ secrets.AI_BASE_URL }}
       FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
       FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
       FEISHU_REPORT_CHAT_ID: ${{ secrets.FEISHU_REPORT_CHAT_ID }}
@@ -21,6 +20,7 @@ jobs:
       DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+      AI_BASE_URL: ${{ secrets.AI_BASE_URL }}
       TIMEZONE: Asia/Shanghai
 
     steps:
