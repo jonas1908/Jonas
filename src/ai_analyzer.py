@@ -84,7 +84,7 @@ def analyze_batch_suggestions(
 
     client = _create_client(config)
     result: List[AnalyzedSuggestion] = []
-    batch_size = 20
+    batch_size = 50
     total_batches = (len(messages) + batch_size - 1) // batch_size
 
     for batch_idx in range(0, len(messages), batch_size):
