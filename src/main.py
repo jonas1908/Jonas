@@ -26,6 +26,7 @@ async def run_weekly_pipeline():
     if not has_discord:
         print("[周报] 未配置 Discord，按 0 条处理。")
     raw_messages = await fetch_suggestions_for_period(config=config, start_time=week_start, end_time=week_end)
+    raw_messages = raw_messages or []
     print(f"[周报] Discord 拉取到 {len(raw_messages)} 条消息。")
     analyzed = analyze_batch_suggestions(config=config, messages=raw_messages)
     print(f"[周报] AI 分析完成，共 {len(analyzed)} 条。")
