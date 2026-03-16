@@ -45,34 +45,40 @@ def analyze_and_rank(config, posts):
     print("[AI] 帖子数: " + str(len(top_posts)))
     api_key = config.openai.api_key
     model = config.openai.model
+    base_url = config.openai.base_url
     print("[AI] API Key: " + str(api_key[:8]) + "..." if api_key else "[AI] API Key: 空!")
     print("[AI] Model: " + str(model))
+    print("[AI] Base URL: " + str(base_url))
     if not api_key:
-        print("[AI] ❌ 没有API Key!")
+        print("[AI] 没有API Key!")
         return _simple_rank(top_posts)
     user_content = ""
     for i in range(len(top_posts)):
         p = top_posts[i]
         user_content = user_content + "[" + str(i) + "] 热度:" + str(p.heat_score) + " | " + p.content[:300] + "\n\n"
     print("[AI] 发送内容长度: " + str(len(user_content)))
-    print("[AI] 内容预览: " + user_content[:200])
-    print("[AI] 正在调用OpenAI...")
+    print("[AI] 正在调用AI...")
     raw = ""
     try:
-        client = OpenAI(api_key=api_key)
+        if base_url:
+            client = OpenAI(api_key=api_key, base_url=base_url)
+            print("[AI] 使用自定义地址: " + base_url)
+        else:
+            client = OpenAI(api_key=api_key)
+            print("[AI] 使用OpenAI官方地址")
         resp = client.chat.completions.create(model=model, messages=[{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": user_content}], timeout=120)
         raw = (resp.choices[0].message.content or "").strip()
-        print("[AI] ✅ OpenAI返回成功")
+        print("[AI] AI返回成功")
         print("[AI] 返回长度: " + str(len(raw)))
-        print("[AI] 完整返回内容:")
+        print("[AI] 完整返回:")
         print(raw)
     except Exception as e:
-        print("[AI] ❌ OpenAI调用失败!")
+        print("[AI] AI调用失败!")
         print("[AI] 错误类型: " + str(type(e).__name__))
         print("[AI] 错误信息: " + str(e))
         traceback.print_exc()
         return _simple_rank(top_posts)
-    print("[AI] 开始解析JSON...")
+    print("[AI] 解析JSON...")
     try:
         clean = raw
         if clean.startswith("```"):
@@ -81,9 +87,9 @@ def analyze_and_rank(config, posts):
         parsed = json.loads(clean)
         if not isinstance(parsed, list):
             parsed = parsed.get("results", parsed.get("data", []))
-        print("[AI] ✅ JSON解析成功，" + str(len(parsed)) + " 组")
+        print("[AI] JSON解析成功，" + str(len(parsed)) + " 组")
     except Exception as e:
-        print("[AI] ❌ JSON解析失败: " + str(e))
+        print("[AI] JSON解析失败: " + str(e))
         print("[AI] 原始内容: " + raw[:500])
         return _simple_rank(top_posts)
     result = []
