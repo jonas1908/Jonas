@@ -20,10 +20,14 @@ SYSTEM_PROMPT = """你是一个游戏社区分析师。我会发给你Discord论
      5.1-7.0 = 比较不满，言辞较激烈
      7.1-9.0 = 非常愤怒，有攻击性言辞
      9.1-10.0 = 极度愤怒，威胁退游或差评
+   - module_category: 模块分类，从以下选项中选择最合适的一个：
+     日常活动、商业化、其他、系统功能、活动玩法、养成系统、战斗系统、数值奖励、经济系统、程序优化、赛季玩法、日常玩法
+     如果都不合适可以自创一个简短分类
+   - sub_category: 二级分类，根据帖子内容总结的更细分类别（如"匹配系统"、"翻译系统"、"皮肤系统"等），不超过6字
    - post_ids: 属于这组的帖子编号数组
 
 严格输出JSON数组，不要任何其他文字：
-[{"title":"标题","description":"诉求分析","anger_score":6.5,"post_ids":[0,3]}]"""
+[{"title":"标题","description":"诉求分析","anger_score":6.5,"module_category":"战斗系统","sub_category":"匹配系统","post_ids":[0,3]}]"""
 
 def _simple_rank(posts):
     print("[AI] 使用简单排序（无AI分析）")
@@ -33,7 +37,7 @@ def _simple_rank(posts):
         parts = p.content.split("\n", 1)
         title = parts[0].replace("【", "").replace("】", "")
         desc = parts[1][:100] if len(parts) > 1 else ""
-        result.append(TopSuggestion(rank=i + 1, title=title, description=desc, heat_score=p.heat_score, anger_score=0.0, similar_count=1, jump_url=p.jump_url))
+        result.append(TopSuggestion(rank=i + 1, title=title, description=desc, heat_score=p.heat_score, anger_score=0.0, similar_count=1, jump_url=p.jump_url, module_category="其他", sub_category="未分类", member_count=p.member_count, message_count=p.message_count, created_at=p.created_at, original_content=p.content[:500]))
     return result
 
 def analyze_and_rank(config, posts):
@@ -99,24 +103,39 @@ def analyze_and_rank(config, posts):
         total_heat = 0
         best_url = ""
         best_heat = 0
+        total_members = 0
+        total_messages = 0
+        best_created_at = ""
+        original_contents = []
         for pid in post_ids:
             if isinstance(pid, int) and pid < len(top_posts):
                 total_heat = total_heat + top_posts[pid].heat_score
+                total_members = total_members + top_posts[pid].member_count
+                total_messages = total_messages + top_posts[pid].message_count
+                original_contents.append(top_posts[pid].content[:200])
                 if top_posts[pid].heat_score > best_heat:
                     best_heat = top_posts[pid].heat_score
                     best_url = top_posts[pid].jump_url
+                    best_created_at = top_posts[pid].created_at
         if total_heat == 0 and idx < len(top_posts):
             total_heat = top_posts[idx].heat_score
             best_url = top_posts[idx].jump_url
+            best_created_at = top_posts[idx].created_at
+            total_members = top_posts[idx].member_count
+            total_messages = top_posts[idx].message_count
+            original_contents.append(top_posts[idx].content[:200])
         if not best_url and idx < len(top_posts):
             best_url = top_posts[idx].jump_url
         anger = float(item.get("anger_score", 5.0))
         similar = max(1, len(post_ids))
         title = str(item.get("title", "未知"))
         desc = str(item.get("description", ""))
-        print("[AI] 第" + str(idx + 1) + "组: " + title + " | 热度:" + str(total_heat) + " | 情绪:" + str(anger) + " | 建议数:" + str(similar))
+        module_category = str(item.get("module_category", "其他"))
+        sub_category = str(item.get("sub_category", "未分类"))
+        original_text = "\n---\n".join(original_contents) if original_contents else ""
+        print("[AI] 第" + str(idx + 1) + "组: " + title + " | 热度:" + str(total_heat) + " | 情绪:" + str(anger) + " | 建议数:" + str(similar) + " | 分类:" + module_category + "/" + sub_category)
         print("[AI] 描述: " + desc[:100])
-        result.append(TopSuggestion(rank=idx + 1, title=title, description=desc, heat_score=total_heat, anger_score=anger, similar_count=similar, jump_url=best_url))
+        result.append(TopSuggestion(rank=idx + 1, title=title, description=desc, heat_score=total_heat, anger_score=anger, similar_count=similar, jump_url=best_url, module_category=module_category, sub_category=sub_category, member_count=total_members, message_count=total_messages, created_at=best_created_at, original_content=original_text))
     result.sort(key=lambda x: x.heat_score, reverse=True)
     for i in range(len(result)):
         result[i].rank = i + 1
