@@ -7,8 +7,11 @@ from .feishu_api import get_tenant_access_token, send_text_message_to_chat
 
 RANK_EMOJI = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
 
-def _build_text(report):
+def _build_text(report, channel_label=""):
     lines = []
+    if channel_label:
+        lines.append("📢 频道：" + channel_label)
+        lines.append("")
     lines.append("🏆 本周玩家建议 Top 10")
     lines.append("📅 " + str(report.week_start.strftime("%Y-%m-%d")) + " ~ " + str(report.week_end.strftime("%Y-%m-%d")))
     lines.append("📊 本周共 " + str(report.total_posts) + " 个帖子")
@@ -26,13 +29,13 @@ def _build_text(report):
             lines.append("")
     return "\n".join(lines)
 
-def send_weekly_report_card(config, report):
+def send_weekly_report_card(config, report, channel_label=""):
     app_id = config.feishu.app_id
     app_secret = config.feishu.app_secret
     if not app_id or not app_secret:
         raise RuntimeError("缺少飞书配置")
     token = get_tenant_access_token(app_id=app_id, app_secret=app_secret)
-    text = _build_text(report)
+    text = _build_text(report, channel_label=channel_label)
     print("[飞书] 发送内容:")
     print(text)
     chat_ids = []
