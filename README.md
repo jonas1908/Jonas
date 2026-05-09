@@ -1,69 +1,88 @@
-# Discord 飞书周报工具
+<img width="576" height="591" alt="image" src="https://github.com/user-attachments/assets/148ed5ec-18d1-4354-ae36-59ed74d4abdb" />**Discord 玩家建议周报机器人**
+📌 项目简介
+自动从 Discord 论坛频道拉取玩家建议帖子，通过 AI 分析合并相似建议并排名 Top10，每周定时：
 
-每周从 Discord 指定频道拉取玩家建议 → 用 OpenAI 分析（分类、总结、打分）→ 生成周报发到飞书群。
+将周报发送到飞书群
+将详细数据写入飞书多维表格（支持增量更新）
 
-## 流程
+**项目结构**
+├── src/
+│   ├── __init__.py
+│   ├── config.py              # 配置读取
+│   ├── models.py              # 数据结构定义
+│   ├── discord_client.py      # Discord API 拉取帖子
+│   ├── ai_analyzer.py         # AI 分析合并 + 分类
+│   ├── feishu_api.py          # 飞书 token 获取
+│   ├── feishu_client.py       # 飞书群消息发送
+│   ├── bitable_writer.py      # 飞书多维表格写入
+│   └── main.py                # 主流程入口
+├── .github/
+│   └── workflows/
+│       └── weekly-report.yml  # GitHub Actions 定时任务
+├── requirements.txt
+└── README.md
 
-1. **Discord**：Bot 从指定服务器/频道拉取本周内的消息  
-2. **AI**：OpenAI 对每条做分类、总结、优先级打分  
-3. **飞书**：应用机器人把周报（概览 + TOP5 + 分类统计）发到指定群
 
-## 本地运行
+**配置说明**
+**GitHub Secrets（必填）**
+Secret名称	说明
+DISCORD_BOT_TOKEN	Discord 机器人 Token
+DISCORD_GUILD_ID	Discord 服务器 ID
+DISCORD_CHANNEL_ID	Discord 论坛频道 ID
+DISCORD_CHANNEL_LABEL	频道标签名（如 玩家建议），显示在周报标题中
+OPENAI_API_KEY	AI API Key
+OPENAI_MODEL	AI 模型名（如 gpt-4o）
+AI_BASE_URL	AI API 地址（如用中转站则填，否则留空）
+FEISHU_APP_ID	飞书应用 App ID
+FEISHU_APP_SECRET	飞书应用 App Secret
+FEISHU_REPORT_CHAT_ID	飞书群 chat_id（周报发送目标群）
+FEISHU_BITABLE_APP_TOKEN	飞书多维表格 app_token
+FEISHU_BITABLE_TABLE_ID	飞书多维表格 table_id
 
-```bash
-cd "/Users/zhangyong/Desktop/周报工具"
-source .venv/bin/activate
+**GitHub Secrets（可选，扩展第二频道）**
+Secret 名称	说明
+DISCORD_CHANNEL_ID_2	第二个 Discord 频道 ID
+DISCORD_CHANNEL_LABEL_2	第二个频道标签名
+FEISHU_REPORT_CHAT_ID_2	第二个频道对应的飞书群 chat_id
 
-# 设置环境变量（或使用 .env）
-export FEISHU_APP_ID="..."
-export FEISHU_APP_SECRET="..."
-export FEISHU_REPORT_CHAT_ID="oc_..."
-export DISCORD_BOT_TOKEN="..."
-export DISCORD_GUILD_ID="123456789"
-export DISCORD_CHANNEL_ID="123456789"
-export OPENAI_API_KEY="sk-..."
-# 可选：OPENAI_MODEL=gpt-4.1-mini
+**运行流程**
+GitHub Actions 定时触发（每周一次）
+        ↓
+Discord API 拉取本周所有帖子
+        ↓
+按热度排序，取前50条发给 AI
+        ↓
+AI 合并相似建议，生成 Top10
+  - 输出：标题、描述、模块分类、二级分类、情绪分
+        ↓
+发送飞书群周报卡片
+        ↓
+写入飞书多维表格（增量更新）
+  - 帖子链接已存在 → 更新该行
+  - 帖子链接不存在 → 新增一行
+  - 旧记录未出现 → 保留不动
 
-python -m src.main
-```
+**多维表格字段说明**
+字段名	类型	数据来源
+日期	日期	帖子创建时间
+AI短标题	文本	AI 生成的简短标题（≤15字）
+模块分类	单选	AI 分类（日常活动/商业化/系统功能/活动玩法/养成系统/战斗系统/数值奖励/经济系统/程序优化/赛季玩法/日常玩法/其他）
+二级分类	单选	AI 根据内容细分（如匹配系统、翻译系统等）
+热度分	数字	帖子回复数累计
+情绪分	数字	AI 打分（1.0-10.0）
+参与人数	数字	帖子线程参与人数（Discord member_count）
+回复数	数字	帖子总消息数（message_count）
+AI核心总结	文本	AI 生成的玩家核心诉求分析
+具体建议	文本	玩家原始帖子内容
+帖子链接	链接	Discord 帖子 URL（也作为去重唯一标识）
 
-## GitHub Actions 每周定时
+**飞书配置前置**
+飞书应用权限：需开通 bitable:app（查看、评论、编辑和管理多维表格）
+多维表格协作者：打开表格 → 分享 → 搜索机器人应用名 → 添加为「可编辑」
+飞书群：机器人需已加入目标飞书群
 
-- 工作流文件：`.github/workflows/weekly-report.yml`  
-- 默认：每周一北京时间 10:00 执行  
-- 可在仓库 **Actions** 里 **Run workflow** 手动触发测试  
-
-### 需要在仓库里配置的 Secrets
-
-| 名称 | 说明 |
-|------|------|
-| `FEISHU_APP_ID` | 飞书应用 App ID |
-| `FEISHU_APP_SECRET` | 飞书应用 App Secret |
-| `FEISHU_REPORT_CHAT_ID` | 发周报的飞书群 chat_id（如 `oc_xxx`） |
-| `DISCORD_BOT_TOKEN` | Discord Bot Token |
-| `DISCORD_GUILD_ID` | Discord 服务器 ID |
-| `DISCORD_CHANNEL_ID` | 要收集建议的 Discord 频道 ID |
-| `OPENAI_API_KEY` | OpenAI API Key |
-| `OPENAI_MODEL` | 可选，默认 `gpt-4.1-mini` |
-
-## Discord Bot 准备
-
-1. [Discord Developer Portal](https://discord.com/developers/applications) 创建应用，在 **Bot** 里添加 Bot，复制 **Token**  
-2. 在 **Bot** 里开启 **Message Content Intent**（否则读不到消息内容）  
-3. 把 Bot 邀请进服务器，并赋予「查看频道」「读取消息历史」权限  
-4. 服务器 ID、频道 ID：在 Discord 里开启「开发者模式」，右键服务器/频道即可「复制 ID」
-
-## 飞书
-
-- 自建应用需开启「机器人」能力  
-- 权限：发消息、获取群信息等（见飞书开放平台文档）  
-- 获取群 `chat_id`：可运行 `python -m src.tools.feishu_list_chats`（需先设置 `FEISHU_APP_ID`、`FEISHU_APP_SECRET`）
-
-## 目录结构
-
-- `src/main.py`：入口，串联 Discord → AI → 飞书  
-- `src/discord_client.py`：拉取 Discord 频道消息  
-- `src/ai_analyzer.py`：OpenAI 分析 + 周报汇总  
-- `src/feishu_client.py`：飞书发周报  
-- `src/feishu_api.py`：飞书 OpenAPI（token、发消息）  
-- `src/tools/feishu_list_chats.py`：列出机器人所在群，查 chat_id  
+**注意事项**
+多维表格写入仅针对第一个频道（DISCORD_CHANNEL_ID）
+写入免费，飞书开放平台不收费
+每次跑完最多新增/更新 10 条记录（Top10）
+表格数据会持续累积，不会删除历史记录
