@@ -9,14 +9,22 @@ def _snowflake_to_time(sid):
     ms = (int(sid) >> 22) + 1420070400000
     return datetime.fromtimestamp(ms / 1000, tz=timezone.utc)
 
-async def fetch_suggestions_for_period(config, start_time, end_time):
-    if not config.discord.bot_token or not config.discord.channel_id:
+async def fetch_suggestions_for_period(config, start_time, end_time, channel_id=None):
+    if not config.discord.bot_token:
         print("[Discord] 缺少配置，跳过。")
         return []
-    print("[Discord] 开始拉取...")
+
+    # 如果传入了channel_id就用传入的，否则用config里的
+    target_channel_id = str(channel_id) if channel_id else str(config.discord.channel_id)
+
+    if not target_channel_id or target_channel_id == "0":
+        print("[Discord] 缺少频道ID，跳过。")
+        return []
+
+    print("[Discord] 开始拉取频道: " + target_channel_id)
     headers = {"Authorization": "Bot " + config.discord.bot_token}
-    channel_id = str(config.discord.channel_id)
     guild_id = str(config.discord.guild_id)
+
     if start_time.tzinfo is not None:
         start_utc = start_time.astimezone(timezone.utc)
     else:
@@ -25,17 +33,20 @@ async def fetch_suggestions_for_period(config, start_time, end_time):
         end_utc = end_time.astimezone(timezone.utc)
     else:
         end_utc = end_time.replace(tzinfo=timezone.utc)
+
     print("[Discord] 时间: " + str(start_utc) + " ~ " + str(end_utc))
+
     all_threads = []
     url1 = "https://discord.com/api/v10/guilds/" + guild_id + "/threads/active"
     r1 = requests.get(url1, headers=headers, timeout=30)
     print("[Discord] 活跃线程响应: " + str(r1.status_code))
     if r1.status_code == 200:
         for t in r1.json().get("threads", []):
-            if str(t.get("parent_id", "")) == channel_id:
+            if str(t.get("parent_id", "")) == target_channel_id:
                 all_threads.append(t)
         print("[Discord] 活跃: " + str(len(all_threads)))
-    url2 = "https://discord.com/api/v10/channels/" + channel_id + "/threads/archived/public"
+
+    url2 = "https://discord.com/api/v10/channels/" + target_channel_id + "/threads/archived/public"
     r2 = requests.get(url2, headers=headers, timeout=30)
     print("[Discord] 归档响应: " + str(r2.status_code))
     if r2.status_code == 200:
@@ -43,7 +54,9 @@ async def fetch_suggestions_for_period(config, start_time, end_time):
         if archived:
             all_threads.extend(archived)
             print("[Discord] 归档: " + str(len(archived)))
+
     print("[Discord] 总线程: " + str(len(all_threads)))
+
     fetched = []
     count = 0
     for thread in all_threads:
@@ -76,6 +89,7 @@ async def fetch_suggestions_for_period(config, start_time, end_time):
         print("[Discord] [" + str(count) + "] " + tname + " | 消息:" + str(mc) + " 热度:" + str(heat))
         post = RawDiscordMessage(message_id=int(tid), author_name=author_name, author_id=author_id, content=full_content, created_at=str(created), jump_url="https://discord.com/channels/" + guild_id + "/" + tid, message_count=mc, reaction_count=0, heat_score=heat)
         fetched.append(post)
+
     fetched.sort(key=lambda x: x.heat_score, reverse=True)
     print("[Discord] 完成，共 " + str(len(fetched)) + " 个")
     if fetched:
