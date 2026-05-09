@@ -1,4 +1,4 @@
-<img width="576" height="591" alt="image" src="https://github.com/user-attachments/assets/148ed5ec-18d1-4354-ae36-59ed74d4abdb" />**Discord 玩家建议周报机器人**
+**Discord 玩家建议周报机器人**
 📌 项目简介
 自动从 Discord 论坛频道拉取玩家建议帖子，通过 AI 分析合并相似建议并排名 Top10，每周定时：
 
