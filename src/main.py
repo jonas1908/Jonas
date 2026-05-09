@@ -6,6 +6,7 @@ from .config import get_config
 from .discord_client import fetch_suggestions_for_period
 from .ai_analyzer import analyze_and_rank, build_weekly_report
 from .feishu_client import send_weekly_report_card
+from .bitable_writer import write_to_bitable
 
 def _get_current_week_range(tz_name):
     tz = zoneinfo.ZoneInfo(tz_name)
@@ -50,9 +51,15 @@ async def run_weekly_pipeline():
             total_posts=len(raw_posts)
         )
 
-        # 在报告中加入频道标签
+        # 发送到飞书群
         send_weekly_report_card(config=config, report=report, channel_label=ch.label)
         print("[周报] 频道 " + ch.label + " 飞书周报已发送。")
+
+        # 写入多维表格（只针对第一个频道 DISCORD_CHANNEL_ID）
+        if ch.channel_id == config.discord.channel_id:
+            print("[周报] 开始写入多维表格...")
+            write_to_bitable(config=config, suggestions=top10)
+            print("[周报] 多维表格写入完成。")
 
     print("")
     print("[周报] ===== 全部频道处理完毕 =====")
