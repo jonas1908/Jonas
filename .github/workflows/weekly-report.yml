@@ -17,6 +17,9 @@ jobs:
       DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
       DISCORD_GUILD_ID: ${{ secrets.DISCORD_GUILD_ID }}
       DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
+      DISCORD_CHANNEL_ID_2: ${{ secrets.DISCORD_CHANNEL_ID_2 }}
+      DISCORD_CHANNEL_LABEL: ${{ secrets.DISCORD_CHANNEL_LABEL }}
+      DISCORD_CHANNEL_LABEL_2: ${{ secrets.DISCORD_CHANNEL_LABEL_2 }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
       AI_BASE_URL: ${{ secrets.AI_BASE_URL }}
