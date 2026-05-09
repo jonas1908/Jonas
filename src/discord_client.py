@@ -14,7 +14,6 @@ async def fetch_suggestions_for_period(config, start_time, end_time, channel_id=
         print("[Discord] 缺少配置，跳过。")
         return []
 
-    # 如果传入了channel_id就用传入的，否则用config里的
     target_channel_id = str(channel_id) if channel_id else str(config.discord.channel_id)
 
     if not target_channel_id or target_channel_id == "0":
@@ -70,7 +69,9 @@ async def fetch_suggestions_for_period(config, start_time, end_time, channel_id=
         tms = int(thread.get("total_message_sent", 0) or 0)
         if tms > mc:
             mc = tms
-        print("[Discord] 线程: " + tname + " mc=" + str(thread.get("message_count")) + " tms=" + str(thread.get("total_message_sent")))
+        # 获取参与人数
+        member_count = int(thread.get("member_count", 0) or 0)
+        print("[Discord] 线程: " + tname + " mc=" + str(thread.get("message_count")) + " tms=" + str(thread.get("total_message_sent")) + " members=" + str(member_count))
         url3 = "https://discord.com/api/v10/channels/" + tid + "/messages?limit=1&after=0"
         r3 = requests.get(url3, headers=headers, timeout=30)
         content = ""
@@ -86,8 +87,8 @@ async def fetch_suggestions_for_period(config, start_time, end_time, channel_id=
             author_id = int(author.get("id", 0))
         heat = mc
         full_content = "【" + tname + "】\n" + content
-        print("[Discord] [" + str(count) + "] " + tname + " | 消息:" + str(mc) + " 热度:" + str(heat))
-        post = RawDiscordMessage(message_id=int(tid), author_name=author_name, author_id=author_id, content=full_content, created_at=str(created), jump_url="https://discord.com/channels/" + guild_id + "/" + tid, message_count=mc, reaction_count=0, heat_score=heat)
+        print("[Discord] [" + str(count) + "] " + tname + " | 消息:" + str(mc) + " 热度:" + str(heat) + " 参与:" + str(member_count))
+        post = RawDiscordMessage(message_id=int(tid), author_name=author_name, author_id=author_id, content=full_content, created_at=str(created), jump_url="https://discord.com/channels/" + guild_id + "/" + tid, message_count=mc, reaction_count=0, heat_score=heat, member_count=member_count)
         fetched.append(post)
 
     fetched.sort(key=lambda x: x.heat_score, reverse=True)
