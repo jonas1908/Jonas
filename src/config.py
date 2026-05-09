@@ -74,11 +74,11 @@ def get_config():
         base_url=os.getenv("AI_BASE_URL", "")
     )
     feishu = FeishuConfig(
-        app_id=os.getenv("FEISHU_APP_ID", ""),
-        app_secret=os.getenv("FEISHU_APP_SECRET", ""),
-        bitable_app_token=os.getenv("FEISHU_BITABLE_APP_TOKEN", ""),
-        bitable_table_id=os.getenv("FEISHU_BITABLE_TABLE_ID", ""),
-        report_chat_id=os.getenv("FEISHU_REPORT_CHAT_ID", "")
+    app_id=os.getenv("FEISHU_APP_ID", ""),
+    app_secret=os.getenv("FEISHU_APP_SECRET", ""),
+    bitable_app_token=os.getenv("FEISHU_BITABLE_APP_TOKEN", ""),
+    bitable_table_id=os.getenv("FEISHU_BITABLE_TABLE_ID", ""),
+    report_chat_id=os.getenv("FEISHU_REPORT_CHAT_ID", "")
     )
     timezone = os.getenv("TIMEZONE", "Asia/Shanghai")
     return AppConfig(discord=discord, openai=openai_cfg, feishu=feishu, timezone=timezone)
