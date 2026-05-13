@@ -6,7 +6,7 @@ import traceback
 from openai import OpenAI
 from .models import TopSuggestion, WeeklyReport
 
-SYSTEM_PROMPT = """你是一个游戏社区分析师。我会发给你Discord论坛帖子列表。
+SYSTEM_PROMPT = """你是一个游戏社区分析师。我会发给你Discord论坛帖子列表，每个帖子前面有唯一ID标识（如 [ID:123456]）。
 
 你的任务：
 1. 将相似或重复的建议合并
@@ -24,10 +24,10 @@ SYSTEM_PROMPT = """你是一个游戏社区分析师。我会发给你Discord论
      日常活动、商业化、其他、系统功能、活动玩法、养成系统、战斗系统、数值奖励、经济系统、程序优化、赛季玩法、日常玩法
      如果都不合适可以自创一个简短分类
    - sub_category: 二级分类，根据帖子内容总结的更细分类别（如"匹配系统"、"翻译系统"、"皮肤系统"等），不超过6字
-   - post_ids: 属于这组的帖子编号数组
+   - post_ids: 属于这组的帖子ID数组（使用我给你的 [ID:xxx] 里的数字）
 
 严格输出JSON数组，不要任何其他文字：
-[{"title":"标题","description":"诉求分析","anger_score":6.5,"module_category":"战斗系统","sub_category":"匹配系统","post_ids":[0,3]}]"""
+[{"title":"标题","description":"诉求分析","anger_score":6.5,"module_category":"战斗系统","sub_category":"匹配系统","post_ids":["1354780389658591263","1355137963578757242"]}]"""
 
 def _simple_rank(posts):
     print("[AI] 使用简单排序（无AI分析）")
@@ -37,31 +37,49 @@ def _simple_rank(posts):
         parts = p.content.split("\n", 1)
         title = parts[0].replace("【", "").replace("】", "")
         desc = parts[1][:100] if len(parts) > 1 else ""
-        result.append(TopSuggestion(rank=i + 1, title=title, description=desc, heat_score=p.heat_score, anger_score=0.0, similar_count=1, jump_url=p.jump_url, module_category="其他", sub_category="未分类", member_count=p.member_count, message_count=p.message_count, created_at=p.created_at, original_content=p.content[:500]))
+        result.append(TopSuggestion(
+            rank=i + 1, title=title, description=desc,
+            heat_score=p.heat_score, anger_score=0.0, similar_count=1,
+            jump_url=p.jump_url, module_category="其他", sub_category="未分类",
+            member_count=p.member_count, message_count=p.message_count,
+            created_at=p.created_at, original_content=p.content[:500]
+        ))
     return result
 
 def analyze_and_rank(config, posts):
     if not posts:
         print("[AI] 没有帖子")
         return []
+
     top_posts = posts[:50]
     print("[AI] ========== 开始AI分析 ==========")
     print("[AI] 帖子数: " + str(len(top_posts)))
+
     api_key = config.openai.api_key
     model = config.openai.model
     base_url = config.openai.base_url
+
     print("[AI] API Key: " + str(api_key[:8]) + "..." if api_key else "[AI] API Key: 空!")
     print("[AI] Model: " + str(model))
     print("[AI] Base URL: " + str(base_url))
+
     if not api_key:
         print("[AI] 没有API Key!")
         return _simple_rank(top_posts)
+
+    # 构建 ID -> post 的映射
+    post_map = {}
+    for p in top_posts:
+        post_map[str(p.message_id)] = p
+
+    # 用真实 thread_id 作为标识发给 AI
     user_content = ""
-    for i in range(len(top_posts)):
-        p = top_posts[i]
-        user_content = user_content + "[" + str(i) + "] 热度:" + str(p.heat_score) + " | " + p.content[:300] + "\n\n"
+    for p in top_posts:
+        user_content = user_content + "[ID:" + str(p.message_id) + "] 热度:" + str(p.heat_score) + " | " + p.content[:300] + "\n\n"
+
     print("[AI] 发送内容长度: " + str(len(user_content)))
     print("[AI] 正在调用AI...")
+
     raw = ""
     try:
         if base_url:
@@ -70,7 +88,15 @@ def analyze_and_rank(config, posts):
         else:
             client = OpenAI(api_key=api_key)
             print("[AI] 使用OpenAI官方地址")
-        resp = client.chat.completions.create(model=model, messages=[{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": user_content}], timeout=120)
+
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_content}
+            ],
+            timeout=120
+        )
         raw = (resp.choices[0].message.content or "").strip()
         print("[AI] AI返回成功")
         print("[AI] 返回长度: " + str(len(raw)))
@@ -82,6 +108,7 @@ def analyze_and_rank(config, posts):
         print("[AI] 错误信息: " + str(e))
         traceback.print_exc()
         return _simple_rank(top_posts)
+
     print("[AI] 解析JSON...")
     try:
         clean = raw
@@ -96,10 +123,12 @@ def analyze_and_rank(config, posts):
         print("[AI] JSON解析失败: " + str(e))
         print("[AI] 原始内容: " + raw[:500])
         return _simple_rank(top_posts)
+
     result = []
     for idx in range(min(10, len(parsed))):
         item = parsed[idx]
         post_ids = item.get("post_ids", [])
+
         total_heat = 0
         best_url = ""
         best_heat = 0
@@ -107,25 +136,35 @@ def analyze_and_rank(config, posts):
         total_messages = 0
         best_created_at = ""
         original_contents = []
+
+        # 用真实ID从 post_map 中查找
         for pid in post_ids:
-            if isinstance(pid, int) and pid < len(top_posts):
-                total_heat = total_heat + top_posts[pid].heat_score
-                total_members = total_members + top_posts[pid].member_count
-                total_messages = total_messages + top_posts[pid].message_count
-                original_contents.append(top_posts[pid].content[:200])
-                if top_posts[pid].heat_score > best_heat:
-                    best_heat = top_posts[pid].heat_score
-                    best_url = top_posts[pid].jump_url
-                    best_created_at = top_posts[pid].created_at
+            pid_str = str(pid)
+            if pid_str in post_map:
+                p = post_map[pid_str]
+                total_heat = total_heat + p.heat_score
+                total_members = total_members + p.member_count
+                total_messages = total_messages + p.message_count
+                original_contents.append(p.content[:200])
+                if p.heat_score > best_heat:
+                    best_heat = p.heat_score
+                    best_url = p.jump_url
+                    best_created_at = p.created_at
+
+        # 兜底：如果AI返回的ID全部无法匹配，用排名位置对应的帖子
         if total_heat == 0 and idx < len(top_posts):
-            total_heat = top_posts[idx].heat_score
-            best_url = top_posts[idx].jump_url
-            best_created_at = top_posts[idx].created_at
-            total_members = top_posts[idx].member_count
-            total_messages = top_posts[idx].message_count
-            original_contents.append(top_posts[idx].content[:200])
+            p = top_posts[idx]
+            total_heat = p.heat_score
+            best_url = p.jump_url
+            best_created_at = p.created_at
+            total_members = p.member_count
+            total_messages = p.message_count
+            original_contents.append(p.content[:200])
+            print("[AI] 警告：第" + str(idx + 1) + "组 post_ids 无法匹配，使用兜底帖子")
+
         if not best_url and idx < len(top_posts):
             best_url = top_posts[idx].jump_url
+
         anger = float(item.get("anger_score", 5.0))
         similar = max(1, len(post_ids))
         title = str(item.get("title", "未知"))
@@ -133,14 +172,30 @@ def analyze_and_rank(config, posts):
         module_category = str(item.get("module_category", "其他"))
         sub_category = str(item.get("sub_category", "未分类"))
         original_text = "\n---\n".join(original_contents) if original_contents else ""
+
         print("[AI] 第" + str(idx + 1) + "组: " + title + " | 热度:" + str(total_heat) + " | 情绪:" + str(anger) + " | 建议数:" + str(similar) + " | 分类:" + module_category + "/" + sub_category)
-        print("[AI] 描述: " + desc[:100])
-        result.append(TopSuggestion(rank=idx + 1, title=title, description=desc, heat_score=total_heat, anger_score=anger, similar_count=similar, jump_url=best_url, module_category=module_category, sub_category=sub_category, member_count=total_members, message_count=total_messages, created_at=best_created_at, original_content=original_text))
+        print("[AI]   链接: " + best_url)
+        print("[AI]   描述: " + desc[:100])
+
+        result.append(TopSuggestion(
+            rank=idx + 1, title=title, description=desc,
+            heat_score=total_heat, anger_score=anger, similar_count=similar,
+            jump_url=best_url, module_category=module_category, sub_category=sub_category,
+            member_count=total_members, message_count=total_messages,
+            created_at=best_created_at, original_content=original_text
+        ))
+
     result.sort(key=lambda x: x.heat_score, reverse=True)
     for i in range(len(result)):
         result[i].rank = i + 1
+
     print("[AI] ========== AI分析完成 ==========")
     return result
 
 def build_weekly_report(config, top_suggestions, week_start, week_end, total_posts):
-    return WeeklyReport(week_start=week_start, week_end=week_end, top_suggestions=top_suggestions, total_posts=total_posts)
+    return WeeklyReport(
+        week_start=week_start,
+        week_end=week_end,
+        top_suggestions=top_suggestions,
+        total_posts=total_posts
+    )
