@@ -36,6 +36,8 @@ async def fetch_suggestions_for_period(config, start_time, end_time, channel_id=
     print("[Discord] 时间: " + str(start_utc) + " ~ " + str(end_utc))
 
     all_threads = []
+
+    # 1. 拉取活跃线程
     url1 = "https://discord.com/api/v10/guilds/" + guild_id + "/threads/active"
     r1 = requests.get(url1, headers=headers, timeout=30)
     print("[Discord] 活跃线程响应: " + str(r1.status_code))
@@ -45,15 +47,37 @@ async def fetch_suggestions_for_period(config, start_time, end_time, channel_id=
                 all_threads.append(t)
         print("[Discord] 活跃: " + str(len(all_threads)))
 
-    url2 = "https://discord.com/api/v10/channels/" + target_channel_id + "/threads/archived/public"
-    r2 = requests.get(url2, headers=headers, timeout=30)
-    print("[Discord] 归档响应: " + str(r2.status_code))
-    if r2.status_code == 200:
-        archived = r2.json().get("threads", [])
-        if archived:
-            all_threads.extend(archived)
-            print("[Discord] 归档: " + str(len(archived)))
+    # 2. 翻页拉取所有归档线程
+    archived_count = 0
+    before_ts = None
+    for page in range(10):  # 最多翻10页，防止死循环
+        url2 = "https://discord.com/api/v10/channels/" + target_channel_id + "/threads/archived/public?limit=100"
+        if before_ts:
+            url2 = url2 + "&before=" + before_ts
+        r2 = requests.get(url2, headers=headers, timeout=30)
+        print("[Discord] 归档第" + str(page + 1) + "页响应: " + str(r2.status_code))
+        if r2.status_code != 200:
+            break
+        data = r2.json()
+        archived = data.get("threads", [])
+        if not archived:
+            break
+        all_threads.extend(archived)
+        archived_count = archived_count + len(archived)
 
+        # 检查是否还有更多
+        has_more = data.get("has_more", False)
+        if not has_more:
+            break
+
+        # 用最后一个线程的 archive_timestamp 作为下一页的 before
+        last_thread = archived[-1]
+        meta = last_thread.get("thread_metadata", {})
+        before_ts = meta.get("archive_timestamp", "")
+        if not before_ts:
+            break
+
+    print("[Discord] 归档总计: " + str(archived_count))
     print("[Discord] 总线程: " + str(len(all_threads)))
 
     fetched = []
@@ -69,9 +93,9 @@ async def fetch_suggestions_for_period(config, start_time, end_time, channel_id=
         tms = int(thread.get("total_message_sent", 0) or 0)
         if tms > mc:
             mc = tms
-        # 获取参与人数
         member_count = int(thread.get("member_count", 0) or 0)
         print("[Discord] 线程: " + tname + " mc=" + str(thread.get("message_count")) + " tms=" + str(thread.get("total_message_sent")) + " members=" + str(member_count))
+
         url3 = "https://discord.com/api/v10/channels/" + tid + "/messages?limit=1&after=0"
         r3 = requests.get(url3, headers=headers, timeout=30)
         content = ""
@@ -85,10 +109,24 @@ async def fetch_suggestions_for_period(config, start_time, end_time, channel_id=
             author = msg.get("author", {})
             author_name = author.get("username", "未知")
             author_id = int(author.get("id", 0))
+
         heat = mc
         full_content = "【" + tname + "】\n" + content
+        jump_url = "https://discord.com/channels/" + guild_id + "/" + tid
         print("[Discord] [" + str(count) + "] " + tname + " | 消息:" + str(mc) + " 热度:" + str(heat) + " 参与:" + str(member_count))
-        post = RawDiscordMessage(message_id=int(tid), author_name=author_name, author_id=author_id, content=full_content, created_at=str(created), jump_url="https://discord.com/channels/" + guild_id + "/" + tid, message_count=mc, reaction_count=0, heat_score=heat, member_count=member_count)
+
+        post = RawDiscordMessage(
+            message_id=int(tid),
+            author_name=author_name,
+            author_id=author_id,
+            content=full_content,
+            created_at=str(created),
+            jump_url=jump_url,
+            message_count=mc,
+            reaction_count=0,
+            heat_score=heat,
+            member_count=member_count
+        )
         fetched.append(post)
 
     fetched.sort(key=lambda x: x.heat_score, reverse=True)
