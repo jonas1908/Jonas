@@ -11,8 +11,13 @@ from .bitable_writer import write_to_bitable
 def _get_current_week_range(tz_name):
     tz = zoneinfo.ZoneInfo(tz_name)
     now = datetime.now(tz)
-    week_start = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
-    week_end = week_start + timedelta(days=7)
+    # 本周一
+    this_monday = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+    # 上周一
+    last_monday = this_monday - timedelta(days=7)
+    # 拉取上周一 ~ 本周一的数据
+    week_start = last_monday
+    week_end = this_monday
     return week_start, week_end
 
 async def run_weekly_pipeline():
